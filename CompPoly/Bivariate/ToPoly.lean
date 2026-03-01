@@ -294,16 +294,12 @@ theorem ofPoly_one
 /-- `toPoly` maps the zero bivariate polynomial to `0`. -/
 lemma toPoly_zero {R : Type*} [BEq R] [LawfulBEq R] [Nontrivial R] [Ring R] :
     toPoly (0 : CBivariate R) = 0 := by
-      -- The sum over the empty set is zero.
-      simp [CBivariate.toPoly]
-      rw [ Finset.sum_eq_zero ]
-      aesop
+  simp [CBivariate.toPoly]; rw [Finset.sum_eq_zero]; aesop
 
 /-- `ofPoly` maps `0` in `R[X][Y]` to the zero bivariate polynomial. -/
 lemma ofPoly_zero {R : Type*} [BEq R] [LawfulBEq R] [Nontrivial R] [Ring R] [DecidableEq R] :
     ofPoly (0 : R[X][Y]) = 0 := by
-      unfold CBivariate.ofPoly
-      simp +decide [ Polynomial.support ]
+  simp [CBivariate.ofPoly]
 
 /-- Ring hom from computable bivariates to Mathlib bivariates. -/
 noncomputable def toPolyRingHom
@@ -551,48 +547,41 @@ theorem evalX_toPoly_coeff {R : Type*} [BEq R] [LawfulBEq R] [Nontrivial R] [Rin
 theorem evalX_toPoly_eval_commute {R : Type*} [BEq R] [LawfulBEq R] [Nontrivial R] [Ring R]
     [DecidableEq R] (a y : R) (hc : Commute a y) (f : CBivariate R) :
     (evalX (R := R) a f).eval y = (toPoly f).evalEval a y := by
-  have h_lhs :
-      (evalX (R := R) a f).toPoly.eval y =
-        ∑ j ∈ (f.toPoly).support, ((f.toPoly).coeff j).eval a * y ^ j := by
+  have h_lhs : (evalX (R := R) a f).toPoly.eval y =
+      ∑ j ∈ f.toPoly.support, (f.toPoly.coeff j).eval a * y ^ j := by
     rw [Polynomial.eval_eq_sum, Polynomial.sum_def]
     rw [Finset.sum_subset (show
-      (evalX (R := R) a f |> CPolynomial.toPoly |> Polynomial.support) ⊆ f.toPoly.support from ?_)]
-    · exact Finset.sum_congr rfl (fun x _ => by rw [CBivariate.evalX_toPoly_coeff])
+      (evalX (R := R) a f |> CPolynomial.toPoly |> Polynomial.support) ⊆
+        f.toPoly.support from ?_)]
+    · exact Finset.sum_congr rfl fun x _ => by rw [evalX_toPoly_coeff]
     · aesop
-    · intro j hj
-      simp_all +decide
-      contrapose! hj
-      simp_all +decide [evalX_toPoly_coeff]
+    · intro j hj; simp_all +decide; contrapose! hj; simp_all +decide [evalX_toPoly_coeff]
   convert h_lhs using 1
   · exact CPolynomial.eval_toPoly y (evalX (R := R) a f)
-  · have h_eval_mul_C :
-      ∀ (q : Polynomial R) (r : R), Commute a r →
+  · have h_eval_mul_C : ∀ (q : Polynomial R) (r : R), Commute a r →
         Polynomial.eval a (q * Polynomial.C r) = Polynomial.eval a q * r := by
       intro q r hr
       induction' q using Polynomial.induction_on' with p q hp hq <;>
         simp_all +decide [mul_assoc, Polynomial.eval_add]
       · simp +decide [add_mul, hp, hq]
       · exact congrArg _ (hr.symm.pow_right _ |> Commute.eq)
-    have h_sum :
-        ∀ (s : Finset ℕ) (g : ℕ → Polynomial R),
-          (∀ j ∈ s, Commute a (y ^ j)) →
-            Polynomial.eval a (∑ j ∈ s, g j * Polynomial.C (y ^ j)) =
-              ∑ j ∈ s, Polynomial.eval a (g j) * y ^ j := by
-      exact fun s g hg => by
+    have h_sum : ∀ (s : Finset ℕ) (g : ℕ → Polynomial R),
+        (∀ j ∈ s, Commute a (y ^ j)) →
+          Polynomial.eval a (∑ j ∈ s, g j * Polynomial.C (y ^ j)) =
+            ∑ j ∈ s, Polynomial.eval a (g j) * y ^ j :=
+      fun s g hg => by
         rw [Polynomial.eval_finset_sum,
           Finset.sum_congr rfl (fun j hj => h_eval_mul_C _ _ (hg j hj))]
-    convert h_sum _ _ _
-    · simp +decide [Polynomial.eval_eq_sum, Polynomial.sum_def]
-    · exact fun j hj => hc.pow_right j
+    convert h_sum _ _ (fun j _ => hc.pow_right j)
+    simp +decide [Polynomial.eval_eq_sum, Polynomial.sum_def]
 
 /--
 `evalX_toPoly_eval_commute` specialized to commutative rings.
 -/
 theorem evalX_toPoly_eval {R : Type*} [BEq R] [LawfulBEq R] [Nontrivial R] [CommRing R]
     [DecidableEq R] (a y : R) (f : CBivariate R) :
-    (evalX (R := R) a f).eval y = (toPoly f).evalEval a y := by
-  simpa using
-    (evalX_toPoly_eval_commute (R := R) (a := a) (y := y) (hc := Commute.all a y) (f := f))
+    (evalX (R := R) a f).eval y = (toPoly f).evalEval a y :=
+  evalX_toPoly_eval_commute a y (Commute.all a y) f
 
 /--
 The `Commute` hypothesis in `evalX_toPoly_eval_commute` is necessary:
@@ -604,22 +593,20 @@ theorem evalX_toPoly_eval_commute_converse
     (h : ∀ f : CBivariate R,
       (evalX (R := R) a f).eval y = (toPoly f).evalEval a y) :
     Commute a y := by
+  -- Instantiate with X*Y to extract the commutativity witness.
   have key := h (monomialXY (R := R) 1 1 1)
   have lhs : (evalX (R := R) a (monomialXY (R := R) 1 1 1)).eval y = a * y := by
     rw [CPolynomial.eval_toPoly]
     have htoPoly : (evalX (R := R) a (monomialXY (R := R) 1 1 1)).toPoly =
         Polynomial.monomial 1 a := by
-      ext j
-      rw [evalX_toPoly_coeff, monomialXY_toPoly]
+      ext j; rw [evalX_toPoly_coeff, monomialXY_toPoly]
       simp [Polynomial.coeff_monomial]
       split_ifs with h
-      · subst h
-        simp [Polynomial.eval_monomial]
+      · subst h; simp [Polynomial.eval_monomial]
       · simp
     rw [htoPoly, Polynomial.eval_monomial, pow_one]
   have rhs : (toPoly (monomialXY (R := R) 1 1 1)).evalEval a y = y * a := by
-    rw [monomialXY_toPoly]
-    simp [Polynomial.evalEval, Polynomial.eval_monomial]
+    simp [monomialXY_toPoly, Polynomial.evalEval, Polynomial.eval_monomial]
   exact lhs.symm.trans key |>.trans rhs
 
 /--
