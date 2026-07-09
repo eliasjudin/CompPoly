@@ -5,6 +5,7 @@ Authors: Quang Dao, Valerii Huhnin
 -/
 
 import CompPoly.Fields.KoalaBear.Basic
+import CompPoly.Fields.KoalaBear.Ext5
 import CompPoly.Fields.KoalaBear.Fast
 
 /-!
